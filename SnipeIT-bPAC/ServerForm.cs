@@ -6,6 +6,29 @@ using System.Text.Json;
 
 namespace SnipeIT_bPAC
 {
+    public struct SnipeItLabelPrint
+    {
+        public string company;
+        public string labelType;
+        public Dictionary<string, object>[] labels;
+
+        public static readonly Dictionary<string, string> companies = new Dictionary<string, string>
+        {
+            {"nsynk", "NSYNK"},
+            {"hyperbowl", "Hyperbowl" },
+            {"penzing-studios", "Penzing Studios" }
+        };
+        public static readonly Dictionary<string, string> labelFiles = new Dictionary<string, string>
+        {
+            {"12mm-name", "12mm_WithName.lbx"},
+            {"12mm-no-name", "12mm_NoName.lbx" },
+            {"18mm-name", "18mm_WithName.lbx"},
+            {"18mm-no-name", "18mm_NoName.lbx" },
+            {"24mm-name", "24mm_WithName.lbx"},
+            {"24mm-no-name", "24mm_NoName.lbx" }
+        };
+    }
+
     public partial class ServerForm : Form
     {
         public HttpListener? Listener;
@@ -152,6 +175,30 @@ namespace SnipeIT_bPAC
             document.EndPrint();
             document.Close();
         }
+        private void DoPrint(SnipeItLabelPrint requests)
+        {
+            var document = new DocumentClass();
+            var templatePath = Path.Combine(textBox_template.Text, SnipeItLabelPrint.companies[requests.company], SnipeItLabelPrint.labelFiles[requests.labelType]);
+            if (!document.Open(templatePath))
+            {
+                throw new Exception("Print error: Unable to open template");
+            }
+            document.StartPrint("", PrintOptionConstants.bpoDefault);
+            foreach (var r in requests.labels)
+            {
+                foreach (var kv in r)
+                {
+                    var obj = document.GetObject(kv.Key);
+                    if (obj != null)
+                    {
+                        obj.Text = kv.Value.ToString();
+                    }
+                }
+                document.PrintOut(1, PrintOptionConstants.bpoDefault);
+            }
+            document.EndPrint();
+            document.Close();
+        }
 
         private void SaveSettings(object? sender = null, EventArgs? e = null) => Properties.Settings.Default.Save();
 
@@ -184,8 +231,9 @@ namespace SnipeIT_bPAC
             }
 
             using var reader = new StreamReader(req.InputStream, Encoding.UTF8);
-            var requests = JsonSerializer.Deserialize<Dictionary<string, object>[]>(reader.ReadToEnd());
-            if (requests == null)
+            //var requests = JsonSerializer.Deserialize<Dictionary<string, object>[]>(reader.ReadToEnd());
+            var requests = JsonSerializer.Deserialize<SnipeItLabelPrint>(reader.ReadToEnd());
+            if (requests.Equals(null))
             {
                 ctx.SendJson(new { code = 400, msg = "Unable to deserialize the JSON" });
                 return;
@@ -196,7 +244,7 @@ namespace SnipeIT_bPAC
                 // Call the bPAC in STAThread
                 Invoke(() => DoPrint(requests));
 
-                Log("Printed " + requests.Length + " labels from " + req.RemoteEndPoint.ToString());
+                Log("Printed " + requests.labels.Length + " labels from " + req.RemoteEndPoint.ToString());
             }
             catch (Exception ex)
             {
