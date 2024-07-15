@@ -3,14 +3,22 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using static System.Windows.Forms.Design.AxImporter;
 
 namespace SnipeIT_bPAC
 {
+    [Serializable]
     public struct SnipeItLabelPrint
     {
-        public string company;
-        public string labelType;
-        public Dictionary<string, object>[] labels;
+        [JsonPropertyName("company")]
+        public string company { get; set; }
+
+        [JsonPropertyName("labelType")]
+        public string labelType { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<Dictionary<string, object>> labels { get; set; }
 
         public static readonly Dictionary<string, string> companies = new Dictionary<string, string>
         {
@@ -120,7 +128,7 @@ namespace SnipeIT_bPAC
                 var port = (ushort)numericUpDown_port.Value;
 
                 Listener = new HttpListener();
-                Listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+                Listener.Prefixes.Add($"http://192.168.1.169:{port}/");
 
                 Listener.Start();
                 BeginGetContext();
@@ -232,7 +240,10 @@ namespace SnipeIT_bPAC
 
             using var reader = new StreamReader(req.InputStream, Encoding.UTF8);
             //var requests = JsonSerializer.Deserialize<Dictionary<string, object>[]>(reader.ReadToEnd());
-            var requests = JsonSerializer.Deserialize<SnipeItLabelPrint>(reader.ReadToEnd());
+            //var options = new JsonSerializerOptions();
+            //options.Converters.Add(new DictionaryStringObjectJsonConverter());
+            string json = reader.ReadToEnd();
+            var requests = JsonSerializer.Deserialize<SnipeItLabelPrint>(json);
             if (requests.Equals(null))
             {
                 ctx.SendJson(new { code = 400, msg = "Unable to deserialize the JSON" });
@@ -244,7 +255,7 @@ namespace SnipeIT_bPAC
                 // Call the bPAC in STAThread
                 Invoke(() => DoPrint(requests));
 
-                Log("Printed " + requests.labels.Length + " labels from " + req.RemoteEndPoint.ToString());
+                Log("Printed " + requests.labels.Count + " labels from " + req.RemoteEndPoint.ToString());
             }
             catch (Exception ex)
             {
